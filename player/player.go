@@ -36,12 +36,12 @@ func NewPlayer(file string) *Player {
 	p.stream = streamer
 	p.format = format
 	p.done = make(chan struct{})
+
 	return p
 }
 
 func (p *Player) Play() {
 	speaker.Init(p.format.SampleRate, p.format.SampleRate.N(time.Second/10))
-
 	ctrl := &beep.Ctrl{Streamer: beep.Seq(p.stream, beep.Callback(func() {
 		p.Done()
 	})), Paused: false}
@@ -65,6 +65,13 @@ func (p *Player) FadeOut() {
 			<-time.After(time.Millisecond * 100)
 		}
 	}()
+}
+
+func (p *Player) Seek(pos int) error {
+	speaker.Lock()
+	err := p.stream.Seek(pos)
+	speaker.Unlock()
+	return err
 }
 
 func (p *Player) Close() {
