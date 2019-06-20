@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/faiface/beep"
+	"github.com/faiface/beep/effects"
 	"github.com/faiface/beep/mp3"
 	"github.com/faiface/beep/speaker"
 )
@@ -16,6 +17,7 @@ type Player struct {
 	fh       io.ReadWriteCloser
 	stream   beep.StreamSeekCloser
 	format   beep.Format
+	volume   *effects.Volume
 	done     chan struct{}
 }
 
@@ -39,9 +41,30 @@ func NewPlayer(file string) *Player {
 
 func (p *Player) Play() {
 	speaker.Init(p.format.SampleRate, p.format.SampleRate.N(time.Second/10))
-	speaker.Play(beep.Seq(p.stream, beep.Callback(func() {
+
+	ctrl := &beep.Ctrl{Streamer: beep.Seq(p.stream, beep.Callback(func() {
 		p.Done()
-	})))
+	})), Paused: false}
+
+	p.volume = &effects.Volume{
+		Streamer: ctrl,
+		Base:     2,
+		Volume:   0,
+		Silent:   false,
+	}
+
+	speaker.Play(p.volume)
+}
+
+func (p *Player) FadeOut() {
+	go func() {
+		for i := float64(0); i > -100; i -= 0.2 {
+			speaker.Lock()
+			p.volume.Volume = i
+			speaker.Unlock()
+			<-time.After(time.Millisecond * 100)
+		}
+	}()
 }
 
 func (p *Player) Close() {
